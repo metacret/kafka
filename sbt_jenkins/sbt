@@ -1,0 +1,14 @@
+# This script is used to launch sbt on developer workstations. It will *NOT* 
+# work on the Jenkins build servers, which should use the sbt4jenkins script
+# instead.  
+
+# The sbt launcher bootstraps itself by downloading its dependencies (jna,
+# Scala, sbt itself) from the Maven Central and org.scala-tools repositories.
+# To reduce build time, the script configures the launcher to retrieve these
+# dependencies from caches on Netflix's Artifactory instance. This is done by
+# providing the launcher with an sbt.boot.properties file that overrides the
+# default repositories: 
+
+# -Dsbt.boot.properties=sbt.boot.properties
+
+java -Xmx1024m -XX:MaxPermSize=256m -Dsbt.boot.properties=sbt.boot.properties -jar `dirname $0`/sbt-launch-0.11.2.jar "$@"

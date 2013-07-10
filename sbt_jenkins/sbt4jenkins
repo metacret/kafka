@@ -31,5 +31,5 @@
 
 # -Dsbt.log.noformat=true
 
-java -Xmx1024m -XX:MaxPermSize=256m -Dbuild.number="$BUILD_NUMBER" -Dsbt.boot=$WORKSPACE/.sbt -Divy.home=$WORKSPACE/.ivy2 -Dsbt.log.noformat=true -jar `dirname $0`/lib/sbt-launch.jar "$@"
+java -Xmx1024m -XX:MaxPermSize=256m -Dsbt.boot=$WORKSPACE/.sbt -Divy.home=$WORKSPACE/.ivy2 -Dsbt.log.noformat=true -jar `dirname $0`/sbt-launch-0.11.2.jar "$@"
 
