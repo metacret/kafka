@@ -25,7 +25,7 @@ base_dir=$(dirname $0)/..
 SCALA_VERSION=2.8.0
 
 # assume all dependencies have been packaged into one jar with sbt-assembly's task "assembly-package-dependency"
-for file in $base_dir/core/target/scala-2.8.0/*.jar;
+for file in $base_dir/core/target/scala-${SCALA_VERSION}/*.jar;
 do
   CLASSPATH=$CLASSPATH:$file
 done
@@ -36,7 +36,7 @@ do
 done
 
 # classpath addition for release
-for file in $base_dir/libs/*.jar;
+for file in $base_dir/lib/*.jar;
 do
   CLASSPATH=$CLASSPATH:$file
 done
