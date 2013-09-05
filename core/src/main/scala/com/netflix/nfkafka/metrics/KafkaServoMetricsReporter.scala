@@ -1,13 +1,9 @@
-package kafka.metrics
+package com.netflix.nfkafka.metrics
 
 import kafka.metrics.{KafkaMetricsReporterMBean, KafkaMetricsConfig, KafkaMetricsReporter}
 import kafka.utils.{VerifiableProperties, Logging}
 import com.yammer.metrics.Metrics
-
 import java.util.concurrent.TimeUnit
-import com.netflix.nfkafka.metrics.ServoReporter
-
-private trait KafkaServoMetricsReporterMBean extends KafkaMetricsReporterMBean
 
 private class KafkaServoMetricsReporter extends KafkaMetricsReporter
                                 with KafkaServoMetricsReporterMBean
@@ -17,7 +13,7 @@ private class KafkaServoMetricsReporter extends KafkaMetricsReporter
   private var initialized = false
 
 
-  override def getMBeanName = "kafka:type=kafka.metrics.KafkaServoMetricsReporter"
+  override def getMBeanName = "kafka:type=com.netflix.nfkafka.metrics.KafkaServoMetricsReporter"
 
 
   override def init(props: VerifiableProperties) {
@@ -56,3 +52,4 @@ private class KafkaServoMetricsReporter extends KafkaMetricsReporter
 
 }
 
+private trait KafkaServoMetricsReporterMBean extends KafkaMetricsReporterMBean
