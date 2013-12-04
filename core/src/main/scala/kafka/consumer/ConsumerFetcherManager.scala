@@ -24,6 +24,7 @@ import scala.collection.immutable
 import collection.mutable.HashMap
 import scala.collection.mutable
 import java.util.concurrent.locks.ReentrantLock
+import kafka.utils.Utils.inLock
 import kafka.utils.ZkUtils._
 import kafka.utils.{ShutdownableThread, SystemTime}
 import kafka.common.TopicAndPartition
@@ -54,7 +55,7 @@ class ConsumerFetcherManager(private val consumerIdString: String,
       val leaderForPartitionsMap = new HashMap[TopicAndPartition, Broker]
       lock.lock()
       try {
-        if (noLeaderPartitionSet.isEmpty) {
+        while (noLeaderPartitionSet.isEmpty) {
           trace("No partition for leader election.")
           cond.await()
         }
@@ -79,7 +80,7 @@ class ConsumerFetcherManager(private val consumerIdString: String,
           }
         }
       } catch {
-        case t => {
+        case t: Throwable => {
             if (!isRunning.get())
               throw t /* If this thread is stopped, propagate this exception to kill the thread. */
             else
@@ -92,7 +93,20 @@ class ConsumerFetcherManager(private val consumerIdString: String,
       leaderForPartitionsMap.foreach {
         case(topicAndPartition, leaderBroker) =>
           val pti = partitionMap(topicAndPartition)
-          addFetcher(topicAndPartition.topic, topicAndPartition.partition, pti.getFetchOffset(), leaderBroker)
+          try {
+            addFetcher(topicAndPartition.topic, topicAndPartition.partition, pti.getFetchOffset(), leaderBroker)
+          } catch {
+            case t: Throwable => {
+                if (!isRunning.get())
+                  throw t /* If this thread is stopped, propagate this exception to kill the thread. */
+                else {
+                  warn("Failed to add leader for partition %s; will retry".format(topicAndPartition), t)
+                  lock.lock()
+                  noLeaderPartitionSet += topicAndPartition
+                  lock.unlock()
+                }
+              }
+          }
       }
 
       shutdownIdleFetcherThreads()
@@ -110,14 +124,11 @@ class ConsumerFetcherManager(private val consumerIdString: String,
     leaderFinderThread = new LeaderFinderThread(consumerIdString + "-leader-finder-thread")
     leaderFinderThread.start()
 
-    lock.lock()
-    try {
+    inLock(lock) {
       partitionMap = topicInfos.map(tpi => (TopicAndPartition(tpi.topic, tpi.partitionId), tpi)).toMap
       this.cluster = cluster
       noLeaderPartitionSet ++= topicInfos.map(tpi => TopicAndPartition(tpi.topic, tpi.partitionId))
       cond.signalAll()
-    } finally {
-      lock.unlock()
     }
   }
 
@@ -145,14 +156,11 @@ class ConsumerFetcherManager(private val consumerIdString: String,
 
   def addPartitionsWithError(partitionList: Iterable[TopicAndPartition]) {
     debug("adding partitions with error %s".format(partitionList))
-    lock.lock()
-    try {
+    inLock(lock) {
       if (partitionMap != null) {
         noLeaderPartitionSet ++= partitionList
         cond.signalAll()
       }
-    } finally {
-      lock.unlock()
     }
   }
 }

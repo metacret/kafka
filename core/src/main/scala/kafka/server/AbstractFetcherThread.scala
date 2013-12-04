@@ -29,6 +29,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kafka.consumer.{PartitionTopicInfo, SimpleConsumer}
 import kafka.api.{FetchRequest, FetchResponse, FetchResponsePartitionData, FetchRequestBuilder}
 import kafka.common.{KafkaException, ClientIdAndBroker, TopicAndPartition, ErrorMapping}
+import kafka.utils.Utils.inLock
 
 
 /**
@@ -70,8 +71,7 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
   }
 
   override def doWork() {
-    partitionMapLock.lock()
-    try {
+    inLock(partitionMapLock) {
       if (partitionMap.isEmpty)
         partitionMapCond.await(200L, TimeUnit.MILLISECONDS)
       partitionMap.foreach {
@@ -79,8 +79,6 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
           fetchRequestBuilder.addFetch(topicAndPartition.topic, topicAndPartition.partition,
                            offset, fetchSize)
       }
-    } finally {
-      partitionMapLock.unlock()
     }
 
     val fetchRequest = fetchRequestBuilder.build()
@@ -95,7 +93,7 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
       trace("issuing to broker %d of fetch request %s".format(sourceBroker.id, fetchRequest))
       response = simpleConsumer.fetch(fetchRequest)
     } catch {
-      case t =>
+      case t: Throwable =>
         if (isRunning.get) {
           warn("Error in fetch %s".format(fetchRequest), t)
           partitionMapLock synchronized {
@@ -107,8 +105,7 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
 
     if (response != null) {
       // process fetched data
-      partitionMapLock.lock()
-      try {
+      inLock(partitionMapLock) {
         response.data.foreach {
           case(topicAndPartition, partitionData) =>
             val (topic, partitionId) = topicAndPartition.asTuple
@@ -136,7 +133,7 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
                       // 2. If the message is corrupt due to a transient state in the log (truncation, partial writes can cause this), we simply continue and
                       //    should get fixed in the subsequent fetches
                       logger.warn("Found invalid messages during fetch for partition [" + topic + "," + partitionId + "] offset " + currentOffset.get + " error " + ime.getMessage)
-                    case e =>
+                    case e: Throwable =>
                       throw new KafkaException("error processing data for partition [%s,%d] offset %d"
                                                .format(topic, partitionId, currentOffset.get), e)
                   }
@@ -147,7 +144,7 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
                     warn("Current offset %d for partition [%s,%d] out of range; reset offset to %d"
                       .format(currentOffset.get, topic, partitionId, newOffset))
                   } catch {
-                    case e =>
+                    case e: Throwable =>
                       warn("Error getting offset for partition [%s,%d] to broker %d".format(topic, partitionId, sourceBroker.id), e)
                       partitionsWithError += topicAndPartition
                   }
@@ -160,8 +157,6 @@ abstract class AbstractFetcherThread(name: String, clientId: String, sourceBroke
               }
             }
         }
-      } finally {
-        partitionMapLock.unlock()
       }
     }
 

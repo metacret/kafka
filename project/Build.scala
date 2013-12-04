@@ -41,16 +41,19 @@ object KafkaBuild extends Build {
   </license>
 </licenses>,
     scalacOptions ++= Seq("-deprecation", "-unchecked", "-g:none"),
-    crossScalaVersions := Seq("2.8.0","2.8.2", "2.9.1", "2.9.2"),
+    crossScalaVersions := Seq("2.8.0","2.8.2", "2.9.1", "2.9.2", "2.10.1"),
+    excludeFilter in unmanagedSources <<= scalaVersion(v => if (v.startsWith("2.8")) "*_2.9+.scala" else "*_2.8.scala"),
     scalaVersion := "2.8.0",
-    version := "0.8.0-beta1",
+    version := "0.8.0",
     publishTo := Some("Apache Maven Repo" at "https://repository.apache.org/service/local/staging/deploy/maven2"),
     credentials += Credentials(Path.userHome / ".m2" / ".credentials"),
     buildNumber := System.getProperty("build.number", ""),
     version <<= (buildNumber, version)  { (build, version)  => if (build == "") version else version + "+" + build},
     releaseName <<= (name, version, scalaVersion) {(name, version, scalaVersion) => name + "_" + scalaVersion + "-" + version},
-    javacOptions ++= Seq("-Xlint:unchecked", "-source", "1.5"),
+    javacOptions in compile ++= Seq("-Xlint:unchecked", "-source", "1.5"),
+    javacOptions in doc ++= Seq("-source", "1.5"),
     parallelExecution in Test := false, // Prevent tests from overrunning each other
+    publishArtifact in Test := true,
     libraryDependencies ++= Seq(
       "log4j"                 % "log4j"        % "1.2.15" exclude("javax.jms", "jms"),
       "net.sf.jopt-simple"    % "jopt-simple"  % "3.2",
@@ -69,11 +72,13 @@ object KafkaBuild extends Build {
           <exclude org="log4j" module="log4j"/>
           <exclude org="jline" module="jline"/>
         </dependency>
-      </dependencies>
+      </dependencies>,
+      mappings in packageBin in Compile += file("LICENSE") -> "LICENSE",
+      mappings in packageBin in Compile += file("NOTICE") -> "NOTICE"
   )
 
   val hadoopSettings = Seq(
-    javacOptions ++= Seq("-Xlint:deprecation"),
+    javacOptions in compile ++= Seq("-Xlint:deprecation"),
     libraryDependencies ++= Seq(
       "org.apache.avro"      % "avro"               % "1.4.0",
       "org.apache.pig"       % "pig"                % "0.8.0",
@@ -111,6 +116,8 @@ object KafkaBuild extends Build {
       val jarFiles = deps.files.filter(f => !products.files.contains(f) && f.getName.endsWith(".jar"))
       val destination = target / "RELEASE" / releaseName
       IO.copyFile(packageBin, destination / packageBin.getName)
+      IO.copyFile(file("LICENSE"), destination / "LICENSE")
+      IO.copyFile(file("NOTICE"), destination / "NOTICE")      
       IO.copy(jarFiles.map { f => (f, destination / "libs" / f.getName) })
       IO.copyDirectory(file("config"), destination / "config")
       IO.copyDirectory(file("bin"), destination / "bin")
