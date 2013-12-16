@@ -18,7 +18,8 @@ libraryDependencies ++= Seq(
   "com.yammer.metrics"    % "metrics-annotation" % "2.2.0",
   "com.netflix.servo"     % "servo-core"  % "0.4.44",
   "org.easymock"          % "easymock"    % "3.0" % "test",
-  "junit"                 % "junit"       % "4.1" % "test"
+  "junit"                 % "junit"       % "4.1" % "test",
+  "org.mockito"           % "mockito-all" % "1.9.5" % "test"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>

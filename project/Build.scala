@@ -58,7 +58,7 @@ object KafkaBuild extends Build {
       "log4j"                 % "log4j"        % "1.2.15" exclude("javax.jms", "jms"),
       "net.sf.jopt-simple"    % "jopt-simple"  % "3.2",
       "org.slf4j"             % "slf4j-simple" % "1.6.4",
-      "com.netflix.eureka"    % "eureka-client" % "1.1.97" intransitive()
+      "com.netflix.eureka"    % "eureka-client" % "1.1.97"
     ),
     // The issue is going from log4j 1.2.14 to 1.2.15, the developers added some features which required
     // some dependencies on various sun and javax packages.

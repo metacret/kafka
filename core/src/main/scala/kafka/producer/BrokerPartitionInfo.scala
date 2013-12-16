@@ -23,13 +23,14 @@ import kafka.utils.Logging
 import kafka.common.ErrorMapping
 import kafka.client.ClientUtils
 import com.netflix.nfkafka.ProducerDiscovery
+import com.netflix.discovery.DiscoveryManager
 
 
 class BrokerPartitionInfo(producerConfig: ProducerConfig,
                           producerPool: ProducerPool,
                           topicPartitionInfo: HashMap[String, TopicMetadata])
         extends Logging {
-  val brokerVipAddress = producerConfig.brokerList
+  val producerDiscovery = new ProducerDiscovery(producerConfig, DiscoveryManager.getInstance().getDiscoveryClient)
 
   /**
    * Return a sequence of (brokerId, numPartitions).
@@ -78,7 +79,7 @@ class BrokerPartitionInfo(producerConfig: ProducerConfig,
    * @param topics the topics for which the metadata is to be fetched
    */
   def updateInfo(topics: Set[String], correlationId: Int) {
-    val brokers = ClientUtils.parseBrokerList(ProducerDiscovery.getBrokerList(brokerVipAddress))
+    val brokers = ClientUtils.parseBrokerList(producerDiscovery.getBrokerList())
     var topicsMetadata: Seq[TopicMetadata] = Nil
     val topicMetadataResponse = ClientUtils.fetchTopicMetadata(topics, brokers, producerConfig, correlationId)
     topicsMetadata = topicMetadataResponse.topicsMetadata

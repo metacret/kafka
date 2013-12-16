@@ -109,4 +109,8 @@ private[kafka] class ZookeeperConsumerConnector(val config: ConsumerConfig,
   def shutdown() {
     underlying.shutdown
   }
+
+  def consumerIdString() {
+    underlying.consumerIdString
+  }
 }

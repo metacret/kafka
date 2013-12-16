@@ -296,6 +296,7 @@ object TestUtils extends Logging {
                            keyEncoder: Encoder[K] = new DefaultEncoder()): Producer[K, V] = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
+    props.put("producer.discovery", "static")
     props.put("send.buffer.bytes", "65536")
     props.put("connect.timeout.ms", "100000")
     props.put("reconnect.interval", "10000")
@@ -307,6 +308,7 @@ object TestUtils extends Logging {
   def getProducerConfig(brokerList: String, partitioner: String = "kafka.producer.DefaultPartitioner"): Properties = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
+    props.put("producer.discovery", "static")
     props.put("partitioner.class", partitioner)
     props.put("message.send.max.retries", "3")
     props.put("retry.backoff.ms", "1000")

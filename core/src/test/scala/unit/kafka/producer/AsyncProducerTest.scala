@@ -62,6 +62,7 @@ class AsyncProducerTest extends JUnit3Suite {
     val props = new Properties()
     props.put("serializer.class", "kafka.serializer.StringEncoder")
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("producer.type", "async")
     props.put("queue.buffering.max.messages", "10")
     props.put("batch.num.messages", "1")
@@ -87,6 +88,7 @@ class AsyncProducerTest extends JUnit3Suite {
     val props = new Properties()
     props.put("serializer.class", "kafka.serializer.StringEncoder")
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("producer.type", "async")
     props.put("batch.num.messages", "1")
 
@@ -166,6 +168,8 @@ class AsyncProducerTest extends JUnit3Suite {
 
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
+
     val broker1 = new Broker(0, "localhost", 9092)
     val broker2 = new Broker(1, "localhost", 9093)
     broker1
@@ -216,6 +220,7 @@ class AsyncProducerTest extends JUnit3Suite {
     val produceData = TestUtils.getMsgStrings(5).map(m => new KeyedMessage[String,String]("topic1",m))
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     val config = new ProducerConfig(props)
     // form expected partitions metadata
     val topic1Metadata = getTopicMetadata("topic1", 0, 0, "localhost", 9092)
@@ -242,6 +247,7 @@ class AsyncProducerTest extends JUnit3Suite {
     producerDataList.append(new KeyedMessage[String,Message]("topic1", "key1", new Message("msg1".getBytes)))
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     val config = new ProducerConfig(props)
 
     // form expected partitions metadata
@@ -272,6 +278,7 @@ class AsyncProducerTest extends JUnit3Suite {
   def testNoBroker() {
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
 
     val config = new ProducerConfig(props)
     // create topic metadata with 0 partitions
@@ -303,6 +310,7 @@ class AsyncProducerTest extends JUnit3Suite {
   def testIncompatibleEncoder() {
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     val config = new ProducerConfig(props)
 
     val producer=new Producer[String, String](config)
@@ -320,6 +328,7 @@ class AsyncProducerTest extends JUnit3Suite {
   def testRandomPartitioner() {
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     val config = new ProducerConfig(props)
 
     // create topic metadata with 0 partitions
@@ -358,6 +367,7 @@ class AsyncProducerTest extends JUnit3Suite {
   def testBrokerListAndAsync() {
     return
     val props = TestUtils.getProducerConfig(TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("producer.type", "async")
     props.put("batch.num.messages", "5")
 
@@ -394,6 +404,7 @@ class AsyncProducerTest extends JUnit3Suite {
   def testFailedSendRetryLogic() {
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("request.required.acks", "1")
     props.put("serializer.class", classOf[StringEncoder].getName.toString)
     props.put("key.serializer.class", classOf[NullEncoder[Int]].getName.toString)
