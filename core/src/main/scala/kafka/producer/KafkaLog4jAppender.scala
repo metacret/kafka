@@ -33,6 +33,7 @@ class KafkaLog4jAppender extends AppenderSkeleton with Logging {
   var enqueueTimeout:String = null
   var queueSize:String = null
   var requiredNumAcks: Int = Int.MaxValue
+  var producerDiscovery:String = null
 
   private var producer: Producer[String, String] = null
 
@@ -60,6 +61,10 @@ class KafkaLog4jAppender extends AppenderSkeleton with Logging {
   def getRequiredNumAcks:Int = requiredNumAcks
   def setRequiredNumAcks(requiredNumAcks:Int) { this.requiredNumAcks = requiredNumAcks }
 
+  def getProducerDiscovery:String = producerDiscovery
+  def setProducerDiscovery(producerDiscovery:String) { this.producerDiscovery = producerDiscovery }
+
+
   override def activateOptions() {
     // check for config parameter validity
     val props = new Properties()
@@ -80,6 +85,7 @@ class KafkaLog4jAppender extends AppenderSkeleton with Logging {
     if(enqueueTimeout != null) props.put("queue.enqueue.timeout.ms", enqueueTimeout)
     if(queueSize != null) props.put("queue.buffering.max.messages", queueSize)
     if(requiredNumAcks != Int.MaxValue) props.put("request.required.acks", requiredNumAcks.toString)
+    if(producerDiscovery != null) props.put("producer.discovery", producerDiscovery)
     val config : ProducerConfig = new ProducerConfig(props)
     producer = new Producer[String, String](config)
     LogLog.debug("Kafka producer connected to " +  config.brokerList)

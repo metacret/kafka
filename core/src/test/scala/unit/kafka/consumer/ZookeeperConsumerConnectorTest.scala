@@ -347,6 +347,7 @@ class ZookeeperConsumerConnectorTest extends JUnit3Suite with KafkaServerTestHar
     val header = "test-%d-%d".format(config.brokerId, partition)
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("partitioner.class", "kafka.utils.FixedValuePartitioner")
     props.put("compression.codec", compression.codec.toString)
     props.put("key.serializer.class", classOf[IntEncoder].getName.toString)
@@ -367,6 +368,7 @@ class ZookeeperConsumerConnectorTest extends JUnit3Suite with KafkaServerTestHar
     var messages: List[String] = Nil
     val props = new Properties()
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(configs))
+    props.put("producer.discovery", "static")
     props.put("partitioner.class", "kafka.utils.FixedValuePartitioner")
     props.put("key.serializer.class", classOf[IntEncoder].getName.toString)
     props.put("serializer.class", classOf[StringEncoder].getName)

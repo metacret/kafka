@@ -44,7 +44,7 @@ do
 done
 
 # classpath addition for release
-for file in $base_dir/libs/*.jar;
+for file in $base_dir/lib/*.jar;
 do
   CLASSPATH=$CLASSPATH:$file
 done
@@ -132,6 +132,3 @@ if [ "x$DAEMON_MODE" = "xtrue" ]; then
 else
   exec $JAVA $KAFKA_HEAP_OPTS $KAFKA_JVM_PERFORMANCE_OPTS $KAFKA_GC_LOG_OPTS $KAFKA_JMX_OPTS $KAFKA_LOG4J_OPTS -cp $CLASSPATH $KAFKA_OPTS "$@"
 fi
-
-
-

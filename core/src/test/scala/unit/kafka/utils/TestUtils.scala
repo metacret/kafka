@@ -38,6 +38,7 @@ import kafka.api._
 import collection.mutable.Map
 import kafka.serializer.{StringEncoder, DefaultEncoder, Encoder}
 import kafka.common.TopicAndPartition
+import kafka.utils.Utils.inLock
 import junit.framework.Assert
 
 
@@ -296,6 +297,7 @@ object TestUtils extends Logging {
                            keyEncoder: Encoder[K] = new DefaultEncoder()): Producer[K, V] = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
+    props.put("producer.discovery", "static")
     props.put("send.buffer.bytes", "65536")
     props.put("connect.timeout.ms", "100000")
     props.put("reconnect.interval", "10000")
@@ -307,6 +309,7 @@ object TestUtils extends Logging {
   def getProducerConfig(brokerList: String, partitioner: String = "kafka.producer.DefaultPartitioner"): Properties = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
+    props.put("producer.discovery", "static")
     props.put("partitioner.class", partitioner)
     props.put("message.send.max.retries", "3")
     props.put("retry.backoff.ms", "1000")
@@ -426,8 +429,7 @@ object TestUtils extends Logging {
     else
       info("Waiting for leader for partition [%s,%d] to be changed from old leader %d".format(topic, partition, oldLeaderOpt.get))
 
-    leaderLock.lock()
-    try {
+    inLock(leaderLock) {
       zkClient.subscribeDataChanges(ZkUtils.getTopicPartitionLeaderAndIsrPath(topic, partition), new LeaderExistsOrChangedListener(topic, partition, leaderLock, leaderExistsOrChanged, oldLeaderOpt, zkClient))
       leaderExistsOrChanged.await(timeoutMs, TimeUnit.MILLISECONDS)
       // check if leader is elected
@@ -442,8 +444,6 @@ object TestUtils extends Logging {
                                    .format(timeoutMs, topic, partition))
       }
       leader
-    } finally {
-      leaderLock.unlock()
     }
   }
   

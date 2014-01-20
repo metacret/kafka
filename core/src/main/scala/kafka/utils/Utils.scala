@@ -535,10 +535,9 @@ object Utils extends Logging {
   def inLock[T](lock: Lock)(fun: => T): T = {
     lock.lock()
     try {
-       return fun
+      return fun
     } finally {
       lock.unlock()
     }
   }
-  
 }
