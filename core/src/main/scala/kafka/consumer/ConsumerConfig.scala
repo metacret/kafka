@@ -26,7 +26,7 @@ object ConsumerConfig extends Config {
   val RefreshMetadataBackoffMs = 200
   val SocketTimeout = 30 * 1000
   val SocketBufferSize = 64*1024
-  val FetchSize = 1024 * 1024
+  val FetchSize = 1024 * 1024 * 10
   val MaxFetchSize = 10*FetchSize
   val DefaultFetcherBackoffMs = 1000
   val AutoCommit = true

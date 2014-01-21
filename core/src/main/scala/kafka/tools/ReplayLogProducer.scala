@@ -46,7 +46,7 @@ object ReplayLogProducer extends Logging {
     consumerProps.put("zookeeper.connect", config.zkConnect)
     consumerProps.put("consumer.timeout.ms", "10000")
     consumerProps.put("auto.offset.reset", OffsetRequest.SmallestTimeString)
-    consumerProps.put("fetch.message.max.bytes", (1024*1024).toString)
+    consumerProps.put("fetch.message.max.bytes", (10*1024*1024).toString)
     consumerProps.put("socket.receive.buffer.bytes", (2 * 1024 * 1024).toString)
     val consumerConfig = new ConsumerConfig(consumerProps)
     val consumerConnector: ConsumerConnector = Consumer.create(consumerConfig)
