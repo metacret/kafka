@@ -151,6 +151,7 @@ object ConsoleProducer {
     props.put("key.serializer.class", keyEncoderClass)
     props.put("serializer.class", valueEncoderClass)
     props.put("send.buffer.bytes", socketBuffer.toString)
+    props.put("producer.discovery", "ip")
     val reader = Class.forName(readerClass).newInstance().asInstanceOf[MessageReader[AnyRef, AnyRef]]
     reader.init(System.in, cmdLineProps)
 
