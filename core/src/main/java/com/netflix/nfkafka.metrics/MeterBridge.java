@@ -22,7 +22,7 @@ public class MeterBridge implements MetricBridge {
         fifteenMinuteRate = meter.fifteenMinuteRate();
     }
 
-    @Monitor(name="count", type= DataSourceType.GAUGE)
+    @Monitor(name="count", type= DataSourceType.COUNTER)
     private long count;
     @Monitor(name="oneMinuteRate", type= DataSourceType.GAUGE)
     private double oneMinuteRate;

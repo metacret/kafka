@@ -35,7 +35,7 @@ object ShutdownBroker extends Logging {
   private def invokeShutdown(params: ShutdownParams): Boolean = {
     var zkClient: ZkClient = null
     try {
-      zkClient = new ZkClient(params.zkConnect, 30000, 30000, ZKStringSerializer)
+      val zkClient = ZkClientFactory.get(params.zkConnect)
       val controllerBrokerId = ZkUtils.getController(zkClient)
       ZkUtils.readDataMaybeNull(zkClient, ZkUtils.BrokerIdsPath + "/" + controllerBrokerId)._1 match {
         case Some(controllerInfo) =>

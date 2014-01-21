@@ -44,7 +44,7 @@ object TopicCommand {
     CommandLineUtils.checkRequiredArgs(opts.parser, opts.options, opts.zkConnectOpt)
     if (!opts.options.has(opts.listOpt)) CommandLineUtils.checkRequiredArgs(opts.parser, opts.options, opts.topicOpt)
     
-    val zkClient = new ZkClient(opts.options.valueOf(opts.zkConnectOpt), 30000, 30000, ZKStringSerializer)
+    val zkClient = ZkClientFactory.get(opts.options.valueOf(opts.zkConnectOpt))
 
     try {
       if(opts.options.has(opts.createOpt))
@@ -53,10 +53,15 @@ object TopicCommand {
         alterTopic(zkClient, opts)
       else if(opts.options.has(opts.deleteOpt))
         deleteTopic(zkClient, opts)
-      else if(opts.options.has(opts.listOpt))
-        listTopics(zkClient, opts)
-      else if(opts.options.has(opts.describeOpt))
-        describeTopic(zkClient, opts)
+      else if(opts.options.has(opts.listOpt)) {
+        val sb = new StringBuilder
+        listTopics(zkClient, opts, sb)
+        println(sb)
+      } else if(opts.options.has(opts.describeOpt)) {
+        val sb = new StringBuilder
+        describeTopic(zkClient, opts, sb)
+        println(sb)
+      }
     } catch {
       case e =>
         println("Error while executing topic command " + e.getMessage)
@@ -122,7 +127,7 @@ object TopicCommand {
     }
   }
   
-  def listTopics(zkClient: ZkClient, opts: TopicCommandOptions) {
+  def listTopics(zkClient: ZkClient, opts: TopicCommandOptions, sb: StringBuilder) {
     if(opts.options.has(opts.topicsWithOverridesOpt)) {
       ZkUtils.getAllTopics(zkClient).sorted.foreach { topic =>
         val configs = AdminUtils.fetchTopicConfig(zkClient, topic)
@@ -130,17 +135,17 @@ object TopicCommand {
           val replicaAssignment = ZkUtils.getReplicaAssignmentForTopics(zkClient, List(topic))
           val numPartitions = replicaAssignment.size
           val replicationFactor = replicaAssignment.head._2.size
-          println("\nTopic:%s\tPartitionCount:%d\tReplicationFactor:%d\tConfigs:%s".format(topic, numPartitions,
-                   replicationFactor, configs.map(kv => kv._1 + "=" + kv._2).mkString(",")))
+          sb.append("\nTopic:%s\tPartitionCount:%d\tReplicationFactor:%d\tConfigs:%s".format(topic, numPartitions,
+                   replicationFactor, configs.map(kv => kv._1 + "=" + kv._2).mkString(","))).append("\n")
         }
       }
     } else {
       for(topic <- ZkUtils.getAllTopics(zkClient).sorted)
-        println(topic)
+        sb.append(topic).append("\n")
     }
   }
   
-  def describeTopic(zkClient: ZkClient, opts: TopicCommandOptions) {
+  def describeTopic(zkClient: ZkClient, opts: TopicCommandOptions, sb: StringBuilder) {
     val topics = getTopics(zkClient, opts)
     val reportUnderReplicatedPartitions = if (opts.options.has(opts.reportUnderReplicatedPartitionsOpt)) true else false
     val reportUnavailablePartitions = if (opts.options.has(opts.reportUnavailablePartitionsOpt)) true else false
@@ -150,10 +155,10 @@ object TopicCommand {
         case Some(topicPartitionAssignment) =>
           val sortedPartitions = topicPartitionAssignment.toList.sortWith((m1, m2) => m1._1 < m2._1)
           if (!reportUnavailablePartitions && !reportUnderReplicatedPartitions) {
-            println(topic)
+            sb.append(topic).append("\n")
             val config = AdminUtils.fetchTopicConfig(zkClient, topic)
-            println("\tconfigs: " + config.map(kv => kv._1 + " = " + kv._2).mkString(", "))
-            println("\tpartitions: " + sortedPartitions.size)
+            sb.append("\tconfigs: " + config.map(kv => kv._1 + " = " + kv._2).mkString(", ")).append("\n")
+            sb.append("\tpartitions: " + sortedPartitions.size).append("\n")
           }
           for ((partitionId, assignedReplicas) <- sortedPartitions) {
             val inSyncReplicas = ZkUtils.getInSyncReplicasForPartition(zkClient, topic, partitionId)
@@ -161,15 +166,15 @@ object TopicCommand {
             if ((!reportUnderReplicatedPartitions && !reportUnavailablePartitions) ||
                 (reportUnderReplicatedPartitions && inSyncReplicas.size < assignedReplicas.size) ||
                 (reportUnavailablePartitions && (!leader.isDefined || !liveBrokers.contains(leader.get)))) {
-              print("\t\ttopic: " + topic)
-              print("\tpartition: " + partitionId)
-              print("\tleader: " + (if(leader.isDefined) leader.get else "none"))
-              print("\treplicas: " + assignedReplicas.mkString(","))
-              println("\tisr: " + inSyncReplicas.mkString(","))
+              sb.append("\t\ttopic: " + topic)
+              sb.append("\tpartition: " + partitionId)
+              sb.append("\tleader: " + (if(leader.isDefined) leader.get else "none"))
+              sb.append("\treplicas: " + assignedReplicas.mkString(","))
+              sb.append("\tisr: " + inSyncReplicas.mkString(",")).append("\n")
             }
           }
         case None =>
-          println("topic " + topic + " doesn't exist!")
+          sb.append("topic " + topic + " doesn't exist!").append("\n")
       }
     }
   }
