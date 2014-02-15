@@ -64,7 +64,7 @@ class ProducerConfig private (val props: VerifiableProperties)
    * a VIP pointing to a subset of brokers.
    */
   val brokerList = props.getString("metadata.broker.list")
-  val brokerDiscoveryMode = props.getString("producer.discovery", "eureka")
+  val brokerDiscoveryMode = props.getString("producer.discovery", "static")
 
   /** the partitioner class for partitioning events amongst sub-topics */
   val partitionerClass = props.getString("partitioner.class", "kafka.producer.DefaultPartitioner")

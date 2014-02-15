@@ -22,8 +22,8 @@ import kafka.common.KafkaException
 import kafka.utils.Logging
 import kafka.common.ErrorMapping
 import kafka.client.ClientUtils
-import com.netflix.nfkafka.ProducerDiscovery
 import com.netflix.discovery.DiscoveryManager
+import com.netflix.nfkafka.ProducerDiscovery
 
 
 class BrokerPartitionInfo(producerConfig: ProducerConfig,

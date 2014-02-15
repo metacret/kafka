@@ -18,20 +18,27 @@ package kafka.producer
 
 import async.{DefaultEventHandler, ProducerSendThread, EventHandler}
 import kafka.utils._
-import java.util.Random
 import java.util.concurrent.{TimeUnit, LinkedBlockingQueue}
 import kafka.serializer.Encoder
 import java.util.concurrent.atomic.AtomicBoolean
 import kafka.common.QueueFullException
 import kafka.metrics._
-
+import com.netflix.nfkafka.filequeue.{SerDe, FileBlockingQueue}
 
 class Producer[K,V](val config: ProducerConfig,
                     private val eventHandler: EventHandler[K,V])  // only for unit testing
   extends Logging {
 
   private val hasShutdown = new AtomicBoolean(false)
-  private val queue = new LinkedBlockingQueue[KeyedMessage[K,V]](config.queueBufferingMaxMessages)
+  private val queue = {
+    if (config.queueType == "memory")
+      new LinkedBlockingQueue[KeyedMessage[K,V]](config.queueBufferingMaxMessages)
+    else
+      new FileBlockingQueue[K, V](
+        config.fileQueuePath,
+        config.fileQueueGCIntervalInSec,
+        Utils.createObject[SerDe[K,V]](config.fileQueueSerDe))
+  }
 
   private var sync: Boolean = true
   private var producerSendThread: ProducerSendThread[K,V] = null

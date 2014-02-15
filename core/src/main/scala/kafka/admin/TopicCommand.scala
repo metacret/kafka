@@ -40,10 +40,9 @@ object TopicCommand {
       opts.parser.printHelpOn(System.err)
       System.exit(1)
     }
-      
-    CommandLineUtils.checkRequiredArgs(opts.parser, opts.options, opts.zkConnectOpt)
-    if (!opts.options.has(opts.listOpt)) CommandLineUtils.checkRequiredArgs(opts.parser, opts.options, opts.topicOpt)
-    
+
+    opts.checkArgs()
+
     val zkClient = ZkClientFactory.get(opts.options.valueOf(opts.zkConnectOpt))
 
     try {
@@ -72,10 +71,13 @@ object TopicCommand {
   }
 
   private def getTopics(zkClient: ZkClient, opts: TopicCommandOptions): Seq[String] = {
-    val topicsSpec = opts.options.valueOf(opts.topicOpt)
-    val topicsFilter = new Whitelist(topicsSpec)
-    val allTopics = ZkUtils.getAllTopics(zkClient)
-    allTopics.filter(topicsFilter.isTopicAllowed).sorted
+    val allTopics = ZkUtils.getAllTopics(zkClient).sorted
+    if (opts.options.has(opts.topicOpt)) {
+      val topicsSpec = opts.options.valueOf(opts.topicOpt)
+      val topicsFilter = new Whitelist(topicsSpec)
+      allTopics.filter(topicsFilter.isTopicAllowed)
+    } else
+      allTopics
   }
 
   def createTopic(zkClient: ZkClient, opts: TopicCommandOptions) {
@@ -112,10 +114,8 @@ object TopicCommand {
         val nPartitions = opts.options.valueOf(opts.partitionsOpt).intValue
         val replicaAssignmentStr = opts.options.valueOf(opts.replicaAssignmentOpt)
         AdminUtils.addPartitions(zkClient, topic, nPartitions, replicaAssignmentStr)
-        println("adding partitions succeeded!")
+        println("Adding partitions succeeded!")
       }
-      if(opts.options.has(opts.replicationFactorOpt))
-        Utils.croak("Changing the replication factor is not supported.")
     }
   }
   
@@ -123,58 +123,55 @@ object TopicCommand {
     val topics = getTopics(zkClient, opts)
     topics.foreach { topic =>
       AdminUtils.deleteTopic(zkClient, topic)
-      println("Topic \"%s\" deleted.".format(topic))
+      println("Topic \"%s\" queued for deletion.".format(topic))
     }
   }
   
   def listTopics(zkClient: ZkClient, opts: TopicCommandOptions, sb: StringBuilder) {
-    if(opts.options.has(opts.topicsWithOverridesOpt)) {
-      ZkUtils.getAllTopics(zkClient).sorted.foreach { topic =>
-        val configs = AdminUtils.fetchTopicConfig(zkClient, topic)
-        if(configs.size() != 0) {
-          val replicaAssignment = ZkUtils.getReplicaAssignmentForTopics(zkClient, List(topic))
-          val numPartitions = replicaAssignment.size
-          val replicationFactor = replicaAssignment.head._2.size
-          sb.append("\nTopic:%s\tPartitionCount:%d\tReplicationFactor:%d\tConfigs:%s".format(topic, numPartitions,
-                   replicationFactor, configs.map(kv => kv._1 + "=" + kv._2).mkString(","))).append("\n")
-        }
-      }
-    } else {
-      for(topic <- ZkUtils.getAllTopics(zkClient).sorted)
+    val topics = getTopics(zkClient, opts)
+    for(topic <- topics)
         sb.append(topic).append("\n")
-    }
   }
   
   def describeTopic(zkClient: ZkClient, opts: TopicCommandOptions, sb: StringBuilder) {
     val topics = getTopics(zkClient, opts)
     val reportUnderReplicatedPartitions = if (opts.options.has(opts.reportUnderReplicatedPartitionsOpt)) true else false
     val reportUnavailablePartitions = if (opts.options.has(opts.reportUnavailablePartitionsOpt)) true else false
+    val reportOverriddenConfigs = if (opts.options.has(opts.topicsWithOverridesOpt)) true else false
     val liveBrokers = ZkUtils.getAllBrokersInCluster(zkClient).map(_.id).toSet
     for (topic <- topics) {
       ZkUtils.getPartitionAssignmentForTopics(zkClient, List(topic)).get(topic) match {
         case Some(topicPartitionAssignment) =>
+          val describeConfigs: Boolean = !reportUnavailablePartitions && !reportUnderReplicatedPartitions
+          val describePartitions: Boolean = !reportOverriddenConfigs
           val sortedPartitions = topicPartitionAssignment.toList.sortWith((m1, m2) => m1._1 < m2._1)
-          if (!reportUnavailablePartitions && !reportUnderReplicatedPartitions) {
-            sb.append(topic).append("\n")
-            val config = AdminUtils.fetchTopicConfig(zkClient, topic)
-            sb.append("\tconfigs: " + config.map(kv => kv._1 + " = " + kv._2).mkString(", ")).append("\n")
-            sb.append("\tpartitions: " + sortedPartitions.size).append("\n")
+          if (describeConfigs) {
+            val configs = AdminUtils.fetchTopicConfig(zkClient, topic)
+            if (!reportOverriddenConfigs || configs.size() != 0) {
+              val numPartitions = topicPartitionAssignment.size
+              val replicationFactor = topicPartitionAssignment.head._2.size
+              sb.append("Topic:%s\tPartitionCount:%d\tReplicationFactor:%d\tConfigs:%s"
+                .format(topic, numPartitions, replicationFactor, configs.map(kv => kv._1 + "=" + kv._2).mkString(",")))
+              .append("\n")
+            }
           }
-          for ((partitionId, assignedReplicas) <- sortedPartitions) {
-            val inSyncReplicas = ZkUtils.getInSyncReplicasForPartition(zkClient, topic, partitionId)
-            val leader = ZkUtils.getLeaderForPartition(zkClient, topic, partitionId)
-            if ((!reportUnderReplicatedPartitions && !reportUnavailablePartitions) ||
-                (reportUnderReplicatedPartitions && inSyncReplicas.size < assignedReplicas.size) ||
-                (reportUnavailablePartitions && (!leader.isDefined || !liveBrokers.contains(leader.get)))) {
-              sb.append("\t\ttopic: " + topic)
-              sb.append("\tpartition: " + partitionId)
-              sb.append("\tleader: " + (if(leader.isDefined) leader.get else "none"))
-              sb.append("\treplicas: " + assignedReplicas.mkString(","))
-              sb.append("\tisr: " + inSyncReplicas.mkString(",")).append("\n")
+          if (describePartitions) {
+            for ((partitionId, assignedReplicas) <- sortedPartitions) {
+              val inSyncReplicas = ZkUtils.getInSyncReplicasForPartition(zkClient, topic, partitionId)
+              val leader = ZkUtils.getLeaderForPartition(zkClient, topic, partitionId)
+              if ((!reportUnderReplicatedPartitions && !reportUnavailablePartitions) ||
+                  (reportUnderReplicatedPartitions && inSyncReplicas.size < assignedReplicas.size) ||
+                  (reportUnavailablePartitions && (!leader.isDefined || !liveBrokers.contains(leader.get)))) {
+                sb.append("\tTopic: " + topic)
+                sb.append("\tPartition: " + partitionId)
+                sb.append("\tLeader: " + (if(leader.isDefined) leader.get else "none"))
+                sb.append("\tReplicas: " + assignedReplicas.mkString(","))
+                sb.append("\tIsr: " + inSyncReplicas.mkString(",")).append("\n")
+              }
             }
           }
         case None =>
-          sb.append("topic " + topic + " doesn't exist!").append("\n")
+          println("Topic " + topic + " doesn't exist!")
       }
     }
   }
@@ -192,15 +189,15 @@ object TopicCommand {
   }
 
   def parseTopicConfigsToBeDeleted(opts: TopicCommandOptions): Seq[String] = {
-    val configsToBeDeleted = opts.options.valuesOf(opts.deleteConfigOpt).map(_.split("""\s*=\s*"""))
-    if(opts.options.has(opts.createOpt))
-      require(configsToBeDeleted.size == 0, "Invalid topic config: all configs on create topic must be in the format \"key=val\".")
-    require(configsToBeDeleted.forall(config => config.length == 1),
-      "Invalid topic config: all configs to be deleted must be in the format \"key\".")
-    val propsToBeDeleted = new Properties
-    configsToBeDeleted.foreach(pair => propsToBeDeleted.setProperty(pair(0).trim, ""))
-    LogConfig.validateNames(propsToBeDeleted)
-    configsToBeDeleted.map(pair => pair(0))
+    if (opts.options.has(opts.deleteConfigOpt)) {
+      val configsToBeDeleted = opts.options.valuesOf(opts.deleteConfigOpt).map(_.trim())
+      val propsToBeDeleted = new Properties
+      configsToBeDeleted.foreach(propsToBeDeleted.setProperty(_, ""))
+      LogConfig.validateNames(propsToBeDeleted)
+      configsToBeDeleted
+    }
+    else
+      Seq.empty
   }
 
   def parseReplicaAssignment(replicaAssignmentList: String): Map[Int, List[Int]] = {
@@ -250,7 +247,7 @@ object TopicCommand {
                            .withRequiredArg
                            .describedAs("replication factor")
                            .ofType(classOf[java.lang.Integer])
-    val replicaAssignmentOpt = parser.accepts("replica-assignment", "A list of manual partition-to-broker assignments for the topic being created.")
+    val replicaAssignmentOpt = parser.accepts("replica-assignment", "A list of manual partition-to-broker assignments for the topic being created or altered.")
                            .withRequiredArg
                            .describedAs("broker_id_for_part1_replica1 : broker_id_for_part1_replica2 , " +
                                         "broker_id_for_part2_replica1 : broker_id_for_part2_replica2 , ...")
@@ -260,10 +257,32 @@ object TopicCommand {
     val reportUnavailablePartitionsOpt = parser.accepts("unavailable-partitions",
                                                             "if set when describing topics, only show partitions whose leader is not available")
     val topicsWithOverridesOpt = parser.accepts("topics-with-overrides",
-                                                "if set when listing topics, only show topics that have overridden configs")
-
+                                                "if set when describing topics, only show topics that have overridden configs")
 
     val options = parser.parse(args : _*)
+
+    val allTopicLevelOpts: Set[OptionSpec[_]] = Set(alterOpt, createOpt, deleteOpt, describeOpt, listOpt)
+
+    def checkArgs() {
+      // check required args
+      CommandLineUtils.checkRequiredArgs(parser, options, zkConnectOpt)
+      if (!options.has(listOpt) && !options.has(describeOpt))
+        CommandLineUtils.checkRequiredArgs(parser, options, topicOpt)
+
+      // check invalid args
+      CommandLineUtils.checkInvalidArgs(parser, options, configOpt, allTopicLevelOpts -- Set(alterOpt, createOpt))
+      CommandLineUtils.checkInvalidArgs(parser, options, deleteConfigOpt, allTopicLevelOpts -- Set(alterOpt))
+      CommandLineUtils.checkInvalidArgs(parser, options, partitionsOpt, allTopicLevelOpts -- Set(alterOpt, createOpt))
+      CommandLineUtils.checkInvalidArgs(parser, options, replicationFactorOpt, allTopicLevelOpts -- Set(createOpt))
+      CommandLineUtils.checkInvalidArgs(parser, options, replicaAssignmentOpt,
+        allTopicLevelOpts -- Set(alterOpt, createOpt) + partitionsOpt + replicationFactorOpt)
+      CommandLineUtils.checkInvalidArgs(parser, options, reportUnderReplicatedPartitionsOpt,
+        allTopicLevelOpts -- Set(describeOpt) + reportUnavailablePartitionsOpt + topicsWithOverridesOpt)
+      CommandLineUtils.checkInvalidArgs(parser, options, reportUnavailablePartitionsOpt,
+        allTopicLevelOpts -- Set(describeOpt) + reportUnderReplicatedPartitionsOpt + topicsWithOverridesOpt)
+      CommandLineUtils.checkInvalidArgs(parser, options, topicsWithOverridesOpt,
+        allTopicLevelOpts -- Set(describeOpt) + reportUnderReplicatedPartitionsOpt + reportUnavailablePartitionsOpt)
+    }
   }
   
 }

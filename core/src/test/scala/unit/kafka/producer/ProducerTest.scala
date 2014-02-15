@@ -94,7 +94,6 @@ class ProducerTest extends JUnit3Suite with ZooKeeperTestHarness with Logging{
     val props1 = new util.Properties()
     props1.put("metadata.broker.list", "localhost:80,localhost:81")
     props1.put("serializer.class", "kafka.serializer.StringEncoder")
-    props1.put("producer.discovery", "static")
     val producerConfig1 = new ProducerConfig(props1)
     val producer1 = new Producer[String, String](producerConfig1)
     try{
@@ -123,9 +122,7 @@ class ProducerTest extends JUnit3Suite with ZooKeeperTestHarness with Logging{
 
     val props3 = new util.Properties()
     props3.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(Seq(config1, config2)))
-    props3.put("producer.discovery", "static")
     props3.put("serializer.class", "kafka.serializer.StringEncoder")
-    props3.put("producer.discovery", "static")
     val producerConfig3 = new ProducerConfig(props3)
     val producer3 = new Producer[String, String](producerConfig3)
     try{
@@ -151,7 +148,6 @@ class ProducerTest extends JUnit3Suite with ZooKeeperTestHarness with Logging{
     props2.putAll(props1)
     props2.put("request.required.acks", "3")
     props2.put("request.timeout.ms", "1000")
-    props2.put("producer.discovery", "static")
 
     val producerConfig1 = new ProducerConfig(props1)
     val producerConfig2 = new ProducerConfig(props2)
@@ -266,7 +262,6 @@ class ProducerTest extends JUnit3Suite with ZooKeeperTestHarness with Logging{
     props.put("partitioner.class", "kafka.utils.StaticPartitioner")
     props.put("request.timeout.ms", String.valueOf(timeoutMs))
     props.put("metadata.broker.list", TestUtils.getBrokerListStrFromConfigs(Seq(config1, config2)))
-    props.put("producer.discovery", "static")
     props.put("request.required.acks", "1")
     props.put("client.id","ProducerTest-testAsyncSendCanCorrectlyFailWithTimeout")
     props.put("producer.discovery", "static")

@@ -17,9 +17,15 @@
 package kafka.producer.async
 
 import kafka.utils.VerifiableProperties
+import com.netflix.nfkafka.filequeue.DefaultSerDe
 
 trait AsyncProducerConfig {
   val props: VerifiableProperties
+
+  val queueType = props.getString("queue.type", "memory")
+  val fileQueuePath = props.getString("queue.file.path", "/logs/kafkaClient")
+  val fileQueueGCIntervalInSec = props.getInt("queue.file.gc.interval.sec", 3600)
+  val fileQueueSerDe = props.getString("queue.file.serde", "DefaultSerDe")
 
   /* maximum time, in milliseconds, for buffering data on the producer queue */
   val queueBufferingMaxMs = props.getInt("queue.buffering.max.ms", 5000)
@@ -43,5 +49,4 @@ trait AsyncProducerConfig {
   
   /** the serializer class for keys (defaults to the same as for values) */
   val keySerializerClass = props.getString("key.serializer.class", serializerClass)
-  
 }
