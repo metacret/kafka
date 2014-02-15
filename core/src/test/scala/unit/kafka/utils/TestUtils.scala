@@ -48,7 +48,7 @@ import kafka.admin.AdminUtils
  */
 object TestUtils extends Logging {
   
-  val IoTmpDir = System.getProperty("java.io.tmpdir")
+  val IoTmpDir = "./build/test/"
 
   val Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
   val Digits = "0123456789"

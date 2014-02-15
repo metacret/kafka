@@ -23,9 +23,9 @@ trait AsyncProducerConfig {
   val props: VerifiableProperties
 
   val queueType = props.getString("queue.type", "memory")
-  val fileQueuePath = props.getString("queue.file.path", "/logs/kafkaClient")
+  val fileQueuePath = props.getString("queue.file.path", "/logs")
   val fileQueueGCIntervalInSec = props.getInt("queue.file.gc.interval.sec", 3600)
-  val fileQueueSerDe = props.getString("queue.file.serde", "DefaultSerDe")
+  val fileQueueSerDe = props.getString("queue.file.serde", "com.netflix.nfkafka.filequeue.DefaultSerDe")
 
   /* maximum time, in milliseconds, for buffering data on the producer queue */
   val queueBufferingMaxMs = props.getInt("queue.buffering.max.ms", 5000)
