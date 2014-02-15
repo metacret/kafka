@@ -132,7 +132,7 @@ project(':core') {
       testCompile "org.scalatest:scalatest_$scalaVersion:1.8"
     }   
 
-    zinc 'com.typesafe.zinc:zinc:0.2.5'
+    //zinc 'com.typesafe.zinc:zinc:0.2.5'
   }
 
   configurations {
@@ -191,7 +191,7 @@ project(':perf') {
     compile "org.scala-lang:scala-library:$scalaVersion"
     compile 'net.sf.jopt-simple:jopt-simple:3.2'
 
-    zinc 'com.typesafe.zinc:zinc:0.2.5'
+    //zinc 'com.typesafe.zinc:zinc:0.2.5'
   }
 
   jar {
