@@ -44,7 +44,7 @@ subprojects {
     scalaCompileOptions.useAnt = false
     configure(scalaCompileOptions.forkOptions) {
       memoryMaximumSize = '1g'
-      jvmArgs = ['-XX:MaxPermSize=512m']
+      jvmArgs = ['-Dzinc.dir=GRADLE_USER_HOME/zinc', '-XX:MaxPermSize=512m']
     }
   }
 }
@@ -94,16 +94,6 @@ project(':core') {
 
   apply plugin: 'scala'
   archivesBaseName = "kafka_${baseScalaVersion}"
-
-  compileScala.taskDependencies.values = compileScala.taskDependencies.values - 'compileJava'  
-  compileJava.dependsOn compileScala 
-  sourceSets {  
-      main {  
-          scala {  
-              srcDir 'src/main/java'  
-          }  
-      }  
-  }  
 
   def (major, minor, trivial) = scalaVersion.tokenize('.')
 
