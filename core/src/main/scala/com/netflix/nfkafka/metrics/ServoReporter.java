@@ -97,7 +97,7 @@ public class ServoReporter extends AbstractPollingReporter implements
             } else if (value instanceof Double) {
                 return new GaugeDoubleBridge(name);
             } else {
-                throw new IllegalArgumentException("invalid guage type: " + value);
+                throw new IllegalArgumentException("invalid gauge type: " + value);
             }
         } else {
             throw new IllegalArgumentException("invalid metric type: " + metric.getClass());

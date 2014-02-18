@@ -24,10 +24,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kafka.common.QueueFullException
 import kafka.metrics._
 import com.netflix.nfkafka.filequeue.{SerDe, FileBlockingQueue}
+import com.yammer.metrics.core.Gauge
 
 class Producer[K,V](val config: ProducerConfig,
                     private val eventHandler: EventHandler[K,V])  // only for unit testing
-  extends Logging {
+  extends Logging with KafkaMetricsGroup {
 
   private val hasShutdown = new AtomicBoolean(false)
   private val queue = {
@@ -39,6 +40,12 @@ class Producer[K,V](val config: ProducerConfig,
         config.fileQueueGCIntervalInSec,
         Utils.createObject[SerDe[K,V]](config.fileQueueSerDe))
   }
+
+  newGauge("ProducerQueueSize",
+    new Gauge[Int] {
+      def value = queue.size()
+    }
+  )
 
   private var sync: Boolean = true
   private var producerSendThread: ProducerSendThread[K,V] = null
