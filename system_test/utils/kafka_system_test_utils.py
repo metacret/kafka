@@ -696,6 +696,7 @@ def start_entity_in_background(systemTestEnv, testcaseEnv, entityId):
     configFile = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "config_filename")
     logFile    = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "log_filename")
 
+    useNewProducer = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "new-producer")
     mmConsumerConfigFile = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId,
                            "mirror_consumer_config_filename")
     mmProducerConfigFile = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId,
@@ -729,15 +730,26 @@ def start_entity_in_background(systemTestEnv, testcaseEnv, entityId):
                   logPathName + "/entity_" + entityId + "_pid'"]
 
     elif role == "mirror_maker":
-        cmdList = ["ssh " + hostname,
-                  "'JAVA_HOME=" + javaHome,
-                 "JMX_PORT=" + jmxPort,
-                  kafkaHome + "/bin/kafka-run-class.sh kafka.tools.MirrorMaker",
-                  "--consumer.config " + configPathName + "/" + mmConsumerConfigFile,
-                  "--producer.config " + configPathName + "/" + mmProducerConfigFile,
-                  "--whitelist=\".*\" >> ",
-                  logPathName + "/" + logFile + " & echo pid:$! > ",
-                  logPathName + "/entity_" + entityId + "_pid'"]
+        if useNewProducer.lower() == "true":
+            cmdList = ["ssh " + hostname,
+                      "'JAVA_HOME=" + javaHome,
+                      "JMX_PORT=" + jmxPort,
+                      kafkaHome + "/bin/kafka-run-class.sh kafka.tools.newproducer.MirrorMaker",
+                      "--consumer.config " + configPathName + "/" + mmConsumerConfigFile,
+                      "--producer.config " + configPathName + "/" + mmProducerConfigFile,
+                      "--whitelist=\".*\" >> ",
+                      logPathName + "/" + logFile + " & echo pid:$! > ",
+                      logPathName + "/entity_" + entityId + "_pid'"]
+        else:       
+            cmdList = ["ssh " + hostname,
+                      "'JAVA_HOME=" + javaHome,
+                      "JMX_PORT=" + jmxPort,
+                      kafkaHome + "/bin/kafka-run-class.sh kafka.tools.MirrorMaker",
+                      "--consumer.config " + configPathName + "/" + mmConsumerConfigFile,
+                      "--producer.config " + configPathName + "/" + mmProducerConfigFile,
+                      "--whitelist=\".*\" >> ",
+                      logPathName + "/" + logFile + " & echo pid:$! > ",
+                      logPathName + "/entity_" + entityId + "_pid'"]
 
     cmdStr = " ".join(cmdList)
 
@@ -933,6 +945,9 @@ def start_producer_in_thread(testcaseEnv, entityConfigList, producerConfig, kafk
     jmxPort           = system_test_utils.get_data_by_lookup_keyval(entityConfigList, "entity_id", entityId, "jmx_port")
     kafkaRunClassBin  = kafkaHome + "/bin/kafka-run-class.sh"
 
+    # first keep track of its pid
+    testcaseEnv.producerHostParentPidDict[entityId] = os.getpid()
+
     # get optional testcase arguments
     numTopicsForAutoGenString = -1
     try:
@@ -957,6 +972,7 @@ def start_producer_in_thread(testcaseEnv, entityConfigList, producerConfig, kafk
     noMsgPerBatch  = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "message")
     requestNumAcks = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "request-num-acks")
     syncMode       = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "sync")
+    useNewProducer = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "new-producer")
     retryBackoffMs = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "producer-retry-backoff-ms")
     numOfRetries   = system_test_utils.get_data_by_lookup_keyval(testcaseConfigsList, "entity_id", entityId, "producer-num-retries")
 
@@ -995,6 +1011,8 @@ def start_producer_in_thread(testcaseEnv, entityConfigList, producerConfig, kafk
     boolArgumentsStr = ""
     if syncMode.lower() == "true":
         boolArgumentsStr = boolArgumentsStr + " --sync"
+    if useNewProducer.lower() == "true":
+        boolArgumentsStr = boolArgumentsStr + " --new-producer"
 
     # keep calling producer until signaled to stop by:
     # testcaseEnv.userDefinedEnvVarDict["stopBackgroundProducer"]
@@ -1089,6 +1107,9 @@ def start_producer_in_thread(testcaseEnv, entityConfigList, producerConfig, kafk
             logger.debug("waiting for TRUE of testcaseEnv.userDefinedEnvVarDict['backgroundProducerStopped']", extra=d)
             testcaseEnv.lock.release()
         time.sleep(1)
+
+    # finally remove itself from the tracking pids
+    del testcaseEnv.producerHostParentPidDict[entityId]
 
 def stop_remote_entity(systemTestEnv, entityId, parentPid, signalType="SIGTERM"):
     clusterEntityConfigDictList = systemTestEnv.clusterEntityConfigDictList
@@ -1481,9 +1502,31 @@ def stop_all_remote_running_processes(systemTestEnv, testcaseEnv):
 
     entityConfigs = systemTestEnv.clusterEntityConfigDictList
 
-    for hostname, producerPPid in testcaseEnv.producerHostParentPidDict.items():
-        producerEntityId = system_test_utils.get_data_by_lookup_keyval(entityConfigs, "hostname", hostname, "entity_id")
-        stop_remote_entity(systemTestEnv, producerEntityId, producerPPid)
+    # If there are any alive local threads that keep starting remote producer performance, we need to kill them;
+    # note we do not need to stop remote processes since they will terminate themselves eventually.
+    if len(testcaseEnv.producerHostParentPidDict) != 0:
+        # =============================================
+        # tell producer to stop
+        # =============================================
+        testcaseEnv.lock.acquire()
+        testcaseEnv.userDefinedEnvVarDict["stopBackgroundProducer"] = True
+        testcaseEnv.lock.release()
+
+        # =============================================
+        # wait for producer thread's update of
+        # "backgroundProducerStopped" to be "True"
+        # =============================================
+        while 1:
+            testcaseEnv.lock.acquire()
+            logger.info("status of backgroundProducerStopped : [" + \
+                str(testcaseEnv.userDefinedEnvVarDict["backgroundProducerStopped"]) + "]", extra=d)
+            if testcaseEnv.userDefinedEnvVarDict["backgroundProducerStopped"]:
+                testcaseEnv.lock.release()
+                logger.info("all producer threads completed", extra=d)
+                break
+            testcaseEnv.lock.release()
+    
+        testcaseEnv.producerHostParentPidDict.clear()
 
     for hostname, consumerPPid in testcaseEnv.consumerHostParentPidDict.items():
         consumerEntityId = system_test_utils.get_data_by_lookup_keyval(entityConfigs, "hostname", hostname, "entity_id")

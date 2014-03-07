@@ -46,10 +46,8 @@ class SimpleConsumer(val host: String,
   }
 
   private def disconnect() = {
-    if(blockingChannel.isConnected) {
-      debug("Disconnecting from " + host + ":" + port)
-      blockingChannel.disconnect()
-    }
+    debug("Disconnecting from " + host + ":" + port)
+    blockingChannel.disconnect()
   }
 
   private def reconnect() {
@@ -66,14 +64,14 @@ class SimpleConsumer(val host: String,
   
   private def sendRequest(request: RequestOrResponse): Receive = {
     lock synchronized {
-      getOrMakeConnection()
       var response: Receive = null
       try {
+        getOrMakeConnection()
         blockingChannel.send(request)
         response = blockingChannel.receive()
       } catch {
         case e : Throwable =>
-          warn("Reconnect due to socket error: %s".format(e.getMessage))
+          info("Reconnect due to socket error: %s".format(e.getMessage))
           // retry once
           try {
             reconnect()

@@ -1,18 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.kafka.clients.producer.internals;
 
@@ -23,7 +19,8 @@ import java.util.Set;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.TimeoutException;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A class encapsulating some of the logic around metadata.
@@ -34,6 +31,8 @@ import org.apache.kafka.common.errors.TimeoutException;
  * topic we don't have any metadata for it will trigger a metadata update.
  */
 public final class Metadata {
+
+    private static final Logger log = LoggerFactory.getLogger(Metadata.class);
 
     private final long refreshBackoffMs;
     private final long metadataExpireMs;
@@ -79,18 +78,19 @@ public final class Metadata {
      */
     public synchronized Cluster fetch(String topic, long maxWaitMs) {
         List<PartitionInfo> partitions = null;
+        long begin = System.currentTimeMillis();
         do {
             partitions = cluster.partitionsFor(topic);
             if (partitions == null) {
-                long begin = System.currentTimeMillis();
                 topics.add(topic);
                 forceUpdate = true;
                 try {
+                    log.trace("Requesting metadata update for topic {}.", topic);
                     wait(maxWaitMs);
                 } catch (InterruptedException e) { /* this is fine, just try again */
                 }
                 long ellapsed = System.currentTimeMillis() - begin;
-                if (ellapsed > maxWaitMs)
+                if (ellapsed >= maxWaitMs)
                     throw new TimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
             } else {
                 return cluster;
@@ -132,6 +132,14 @@ public final class Metadata {
         this.lastRefresh = now;
         this.cluster = cluster;
         notifyAll();
+        log.debug("Updated cluster metadata to {}", cluster);
+    }
+
+    /**
+     * The last time metadata was updated.
+     */
+    public synchronized long lastUpdate() {
+        return this.lastRefresh;
     }
 
 }

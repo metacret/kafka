@@ -62,7 +62,7 @@ public class ProducerConfig extends AbstractConfig {
     /**
      * The total memory used by the producer to buffer records waiting to be sent to the server. If records are sent
      * faster than they can be delivered to the server the producer will either block or throw an exception based on the
-     * preference specified by {@link #BLOCK_ON_BUFFER_FULL}.
+     * preference specified by {@link #BLOCK_ON_BUFFER_FULL_CONFIG}.
      */
     public static final String TOTAL_BUFFER_MEMORY_CONFIG = "total.memory.bytes";
 
@@ -90,12 +90,6 @@ public class ProducerConfig extends AbstractConfig {
     public static final String LINGER_MS_CONFIG = "linger.ms";
 
     /**
-     * Force a refresh of the cluster metadata after this period of time. This ensures that changes to the number of
-     * partitions or other settings will by taken up by producers without restart.
-     */
-    public static final String METADATA_REFRESH_MS_CONFIG = "topic.metadata.refresh.interval.ms";
-
-    /**
      * The id string to pass to the server when making requests. The purpose of this is to be able to track the source
      * of requests beyond just ip/port by allowing a logical application name to be included.
      */
@@ -105,6 +99,11 @@ public class ProducerConfig extends AbstractConfig {
      * The size of the TCP send buffer to use when sending data
      */
     public static final String SEND_BUFFER_CONFIG = "send.buffer.bytes";
+
+    /**
+     * The size of the TCP receive buffer to use when reading data (you generally shouldn't need to change this)
+     */
+    public static final String RECEIVE_BUFFER_CONFIG = "receive.buffer.bytes";
 
     /**
      * The maximum size of a request. This is also effectively a cap on the maximum record size. Note that the server
@@ -123,9 +122,23 @@ public class ProducerConfig extends AbstractConfig {
      * this setting is true and we block, however users who want to guarantee we never block can turn this into an
      * error.
      */
-    public static final String BLOCK_ON_BUFFER_FULL = "block.on.buffer.full";
+    public static final String BLOCK_ON_BUFFER_FULL_CONFIG = "block.on.buffer.full";
 
-    public static final String ENABLE_JMX = "enable.jmx";
+    /**
+     * The maximum number of times to attempt resending the request before giving up.
+     */
+    public static final String MAX_RETRIES_CONFIG = "request.retries";
+
+    /**
+     * The amount of time to wait before attempting to resend produce request to a given topic partition. This avoids
+     * repeated sending-and-failing in a tight loop
+     */
+    public static final String RETRY_BACKOFF_MS_CONFIG = "retry.backoff.ms";
+
+    /**
+     * Should we register the Kafka metrics as JMX mbeans?
+     */
+    public static final String ENABLE_JMX_CONFIG = "enable.jmx";
 
     static {
         /* TODO: add docs */
@@ -139,13 +152,15 @@ public class ProducerConfig extends AbstractConfig {
                                 .define(REQUIRED_ACKS_CONFIG, Type.INT, 1, between(-1, Short.MAX_VALUE), "blah blah")
                                 .define(REQUEST_TIMEOUT_CONFIG, Type.INT, 30 * 1000, atLeast(0), "blah blah")
                                 .define(LINGER_MS_CONFIG, Type.LONG, 0, atLeast(0L), "blah blah")
-                                .define(METADATA_REFRESH_MS_CONFIG, Type.LONG, 10 * 60 * 1000, atLeast(-1L), "blah blah")
                                 .define(CLIENT_ID_CONFIG, Type.STRING, "", "blah blah")
                                 .define(SEND_BUFFER_CONFIG, Type.INT, 128 * 1024, atLeast(0), "blah blah")
+                                .define(RECEIVE_BUFFER_CONFIG, Type.INT, 32 * 1024, atLeast(0), "blah blah")
                                 .define(MAX_REQUEST_SIZE_CONFIG, Type.INT, 1 * 1024 * 1024, atLeast(0), "blah blah")
                                 .define(RECONNECT_BACKOFF_MS_CONFIG, Type.LONG, 10L, atLeast(0L), "blah blah")
-                                .define(BLOCK_ON_BUFFER_FULL, Type.BOOLEAN, true, "blah blah")
-                                .define(ENABLE_JMX, Type.BOOLEAN, true, "");
+                                .define(BLOCK_ON_BUFFER_FULL_CONFIG, Type.BOOLEAN, true, "blah blah")
+                                .define(ENABLE_JMX_CONFIG, Type.BOOLEAN, true, "")
+                                .define(MAX_RETRIES_CONFIG, Type.INT, 0, between(0, Integer.MAX_VALUE), "")
+                                .define(RETRY_BACKOFF_MS_CONFIG, Type.LONG, 100L, atLeast(0L), "blah blah");
     }
 
     ProducerConfig(Map<? extends Object, ? extends Object> props) {

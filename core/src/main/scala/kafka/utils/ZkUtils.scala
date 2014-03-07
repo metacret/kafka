@@ -101,7 +101,7 @@ object ZkUtils extends Logging {
   }
   
   def setupCommonPaths(zkClient: ZkClient) {
-    for(path <- Seq(ConsumersPath, BrokerIdsPath, BrokerTopicsPath, TopicConfigChangesPath, TopicConfigPath))
+    for(path <- Seq(ConsumersPath, BrokerIdsPath, BrokerTopicsPath, TopicConfigChangesPath, TopicConfigPath, DeleteTopicsPath))
       makeSurePersistentPathExists(zkClient, path)
   }
 
@@ -208,6 +208,12 @@ object ZkUtils extends Logging {
           + "timeout so it appears to be re-registering.")
     }
     info("Registered broker %d at path %s with address %s:%d.".format(id, brokerIdPath, host, port))
+  }
+
+  def deregisterBrokerInZk(zkClient: ZkClient, id: Int) {
+    val brokerIdPath = ZkUtils.BrokerIdsPath + "/" + id
+    deletePath(zkClient, brokerIdPath)
+    info("Deregistered broker %d at path %s.".format(id, brokerIdPath))
   }
 
   def getConsumerPartitionOwnerPath(group: String, topic: String, partition: Int): String = {

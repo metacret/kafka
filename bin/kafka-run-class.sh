@@ -23,21 +23,17 @@ fi
 base_dir=$(dirname $0)/..
 
 # create logs directory
-LOG_DIR=$base_dir/logs
-if [ ! -d $LOG_DIR ]; then
-	mkdir $LOG_DIR
+if [ "x$LOG_DIR" = "x" ]; then
+    LOG_DIR="$base_dir/logs"
+fi
+
+if [ ! -d "$LOG_DIR" ]; then
+    mkdir -p "$LOG_DIR"
 fi
 
 if [ -z "$SCALA_VERSION" ]; then
 	SCALA_VERSION=2.8.0
 fi
-
-# TODO: remove when removing sbt
-# assume all dependencies have been packaged into one jar with sbt-assembly's task "assembly-package-dependency"
-for file in $base_dir/core/target/scala-${SCALA_VERSION}/*.jar;
-do
-  CLASSPATH=$CLASSPATH:$file
-done
 
 # run ./gradlew copyDependantLibs to get all dependant jars in a local dir
 for file in $base_dir/core/build/dependant-libs-${SCALA_VERSION}/*.jar;
@@ -65,7 +61,7 @@ do
   CLASSPATH=$CLASSPATH:$file
 done
 
-for file in $base_dir/clients/target/scala-${SCALA_VERSION}/clients*.jar;
+for file in $base_dir/clients/build/libs/kafka-clients*.jar;
 do
   CLASSPATH=$CLASSPATH:$file
 done

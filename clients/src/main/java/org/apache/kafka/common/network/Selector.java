@@ -1,18 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.kafka.common.network;
 
@@ -31,7 +27,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.kafka.common.KafkaException;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A selector interface for doing non-blocking multi-connection network I/O.
@@ -62,6 +59,8 @@ import org.apache.kafka.common.KafkaException;
  * This class is not thread safe!
  */
 public class Selector implements Selectable {
+
+    private static final Logger log = LoggerFactory.getLogger(Selector.class);
 
     private final java.nio.channels.Selector selector;
     private final Map<Integer, SelectionKey> keys;
@@ -145,17 +144,12 @@ public class Selector implements Selectable {
      */
     @Override
     public void close() {
-        for (SelectionKey key : this.selector.keys()) {
-            try {
-                close(key);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        for (SelectionKey key : this.selector.keys())
+            close(key);
         try {
             this.selector.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Exception closing selector:", e);
         }
     }
 
@@ -206,9 +200,7 @@ public class Selector implements Selectable {
                 Transmissions transmissions = transmissions(key);
                 SocketChannel channel = channel(key);
                 try {
-                    /*
-                     * complete any connections that have finished their handshake
-                     */
+                    /* complete any connections that have finished their handshake */
                     if (key.isConnectable()) {
                         channel.finishConnect();
                         key.interestOps(key.interestOps() & ~SelectionKey.OP_CONNECT | SelectionKey.OP_READ);
@@ -227,9 +219,7 @@ public class Selector implements Selectable {
                         }
                     }
 
-                    /*
-                     * write to any sockets that have space in their buffer and for which we have data
-                     */
+                    /* write to any sockets that have space in their buffer and for which we have data */
                     if (key.isWritable()) {
                         transmissions.send.writeTo(channel);
                         if (transmissions.send.remaining() <= 0) {
@@ -243,7 +233,7 @@ public class Selector implements Selectable {
                     if (!key.isValid())
                         close(key);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.error("Error in I/O: ", e);
                     close(key);
                 }
             }
@@ -299,15 +289,23 @@ public class Selector implements Selectable {
     /**
      * Begin closing this connection
      */
-    private void close(SelectionKey key) throws IOException {
+    private void close(SelectionKey key) {
         SocketChannel channel = channel(key);
         Transmissions trans = transmissions(key);
-        if (trans != null)
+        if (trans != null) {
             this.disconnected.add(trans.id);
+            this.keys.remove(trans.id);
+            trans.clearReceive();
+            trans.clearSend();
+        }
         key.attach(null);
         key.cancel();
-        channel.socket().close();
-        channel.close();
+        try {
+            channel.socket().close();
+            channel.close();
+        } catch (IOException e) {
+            log.error("Exception closing connection to node {}:", trans.id, e);
+        }
     }
 
     /**

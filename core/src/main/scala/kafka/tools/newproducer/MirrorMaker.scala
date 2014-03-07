@@ -84,7 +84,7 @@ object MirrorMaker extends Logging {
       new Blacklist(options.valueOf(blacklistOpt))
     val producerConfig = options.valueOf(producerConfigOpt)
     val producerProps = Utils.loadProps(producerConfig)
-    producerProps.setProperty(ProducerConfig.BLOCK_ON_BUFFER_FULL, "true")
+    producerProps.setProperty(ProducerConfig.BLOCK_ON_BUFFER_FULL_CONFIG, "true")
     val consumerConfig = options.valueOf(consumerConfigOpt)
     val numStreams = options.valueOf(numStreamsOpt)
     producerChannel = new ProducerDataChannel()
@@ -168,10 +168,10 @@ object MirrorMaker extends Logging {
         val producerId = Utils.abs(java.util.Arrays.hashCode(producerRecord.key())) % producers.size
         trace("Send message with key %s to producer %d.".format(java.util.Arrays.toString(producerRecord.key()), producerId))
         val producer = producers(producerId)
-        producer.send(producerRecord)
+        producer.send(producerRecord, Utils.errorLoggingCallback(producerRecord.key(), producerRecord.value()))
       } else {
         val producerId = producerIndex.getAndSet((producerIndex.get() + 1) % producers.size)
-        producers(producerId).send(producerRecord)
+        producers(producerId).send(producerRecord, Utils.errorLoggingCallback(producerRecord.key(), producerRecord.value()))
         trace("Sent message to producer " + producerId)
       }
     }

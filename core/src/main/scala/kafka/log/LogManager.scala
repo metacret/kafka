@@ -162,7 +162,7 @@ class LogManager(val logDirs: Array[File],
    * Close all the logs
    */
   def shutdown() {
-    debug("Shutting down.")
+    info("Shutting down.")
     try {
       // stop the cleaner first
       if(cleaner != null)
@@ -179,7 +179,7 @@ class LogManager(val logDirs: Array[File],
       // regardless of whether the close succeeded, we need to unlock the data directories
       dirLocks.foreach(_.destroy())
     }
-    debug("Shutdown complete.")
+    info("Shutdown complete.")
   }
 
   /**
@@ -351,7 +351,7 @@ class LogManager(val logDirs: Array[File],
     debug("Beginning log cleanup...")
     var total = 0
     val startMs = time.milliseconds
-    for(log <- allLogs; if !log.config.dedupe) {
+    for(log <- allLogs; if !log.config.compact) {
       debug("Garbage collecting '" + log.name + "'")
       total += cleanupExpiredSegments(log) + cleanupSegmentsToMaintainSize(log)
     }

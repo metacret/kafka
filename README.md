@@ -16,6 +16,10 @@ Follow instuctions in http://kafka.apache.org/documentation.html#quickstart
 ### Running a particular unit test ###
     ./gradlew -Dtest.single=RequestResponseSerializationTest core:test
 
+### Running a particular unit test with log4j output ###
+    change the log4j setting in either clients/src/test/resources/log4j.properties or core/src/test/resources/log4j.properties
+    ./gradlew -i -Dtest.single=RequestResponseSerializationTest core:test
+
 ### Building a binary release gzipped tar ball ###
     ./gradlew clean
     ./gradlew releaseTarGz  
@@ -55,7 +59,7 @@ This is for 'core', 'perf', 'contrib:hadoop-consumer', 'contrib:hadoop-producer'
 ### Publishing the jar for all version of Scala and for all projects to maven ###
     ./gradlew uploadArchivesAll
 
-Please note for this to work you need to create/update `~/.gradle/gradle.properties` and assign the following variables
+Please note for this to work you should create/update `~/.gradle/gradle.properties` and assign the following variables
 
     mavenUrl=
     mavenUsername=

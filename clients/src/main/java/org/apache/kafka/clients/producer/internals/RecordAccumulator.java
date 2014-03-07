@@ -1,25 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership. The ASF licenses this file
+ * to You under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.kafka.clients.producer.internals;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -38,24 +33,28 @@ import org.apache.kafka.common.record.Records;
 import org.apache.kafka.common.utils.CopyOnWriteMap;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * This class acts as a queue that accumulates records into {@link org.apache.kafka.common.record.MemoryRecords} instances to be
- * sent to the server.
+ * This class acts as a queue that accumulates records into {@link org.apache.kafka.common.record.MemoryRecords}
+ * instances to be sent to the server.
  * <p>
  * The accumulator uses a bounded amount of memory and append calls will block when that memory is exhausted, unless
  * this behavior is explicitly disabled.
  */
 public final class RecordAccumulator {
 
+    private static final Logger log = LoggerFactory.getLogger(RecordAccumulator.class);
+
     private volatile boolean closed;
     private int drainIndex;
     private final int batchSize;
     private final long lingerMs;
-    private final ConcurrentMap<TopicPartition, Deque<RecordBatch>> batches;
+    private final long retryBackoffMs;
     private final BufferPool free;
     private final Time time;
+    private final ConcurrentMap<TopicPartition, Deque<RecordBatch>> batches;
 
     /**
      * Create a new record accumulator
@@ -65,16 +64,25 @@ public final class RecordAccumulator {
      * @param lingerMs An artificial delay time to add before declaring a records instance that isn't full ready for
      *        sending. This allows time for more records to arrive. Setting a non-zero lingerMs will trade off some
      *        latency for potentially better throughput due to more batching (and hence fewer, larger requests).
+     * @param retryBackoffMs An artificial delay time to retry the produce request upon receiving an error. This avoids
+     *        exhausting all retries in a short period of time.
      * @param blockOnBufferFull If true block when we are out of memory; if false throw an exception when we are out of
      *        memory
      * @param metrics The metrics
      * @param time The time instance to use
      */
-    public RecordAccumulator(int batchSize, long totalSize, long lingerMs, boolean blockOnBufferFull, Metrics metrics, Time time) {
+    public RecordAccumulator(int batchSize,
+                             long totalSize,
+                             long lingerMs,
+                             long retryBackoffMs,
+                             boolean blockOnBufferFull,
+                             Metrics metrics,
+                             Time time) {
         this.drainIndex = 0;
         this.closed = false;
         this.batchSize = batchSize;
         this.lingerMs = lingerMs;
+        this.retryBackoffMs = retryBackoffMs;
         this.batches = new CopyOnWriteMap<TopicPartition, Deque<RecordBatch>>();
         this.free = new BufferPool(totalSize, batchSize, blockOnBufferFull);
         this.time = time;
@@ -132,6 +140,7 @@ public final class RecordAccumulator {
 
         // we don't have an in-progress record batch try to allocate a new batch
         int size = Math.max(this.batchSize, Records.LOG_OVERHEAD + Record.recordSize(key, value));
+        log.trace("Allocating a new {} byte message buffer for topic {} partition {}", size, tp.topic(), tp.partition());
         ByteBuffer buffer = free.allocate(size);
         synchronized (dq) {
             RecordBatch first = dq.peekLast();
@@ -148,6 +157,18 @@ public final class RecordAccumulator {
             FutureRecordMetadata future = Utils.notNull(batch.tryAppend(key, value, compression, callback));
             dq.addLast(batch);
             return future;
+        }
+    }
+
+    /**
+     * Re-enqueue the given record batch in the accumulator to retry
+     */
+    public void reenqueue(RecordBatch batch, long now) {
+        batch.attempts++;
+        batch.lastAttempt = now;
+        Deque<RecordBatch> deque = dequeFor(batch.topicPartition);
+        synchronized (deque) {
+            deque.addFirst(batch);
         }
     }
 
@@ -171,9 +192,11 @@ public final class RecordAccumulator {
             synchronized (deque) {
                 RecordBatch batch = deque.peekFirst();
                 if (batch != null) {
+                    boolean backingOff = batch.attempts > 0 && batch.lastAttempt + retryBackoffMs > now;
                     boolean full = deque.size() > 1 || !batch.records.buffer().hasRemaining();
                     boolean expired = now - batch.created >= lingerMs;
-                    if (full | expired | exhausted | closed)
+                    boolean sendable = full || expired || exhausted || closed;
+                    if (sendable && !backingOff)
                         ready.add(batch.topicPartition);
                 }
             }
@@ -229,16 +252,10 @@ public final class RecordAccumulator {
     }
 
     /**
-     * Deallocate the list of record batches
+     * Deallocate the record batch
      */
-    public void deallocate(Collection<RecordBatch> batches) {
-        ByteBuffer[] buffers = new ByteBuffer[batches.size()];
-        int i = 0;
-        for (RecordBatch batch : batches) {
-            buffers[i] = batch.records.buffer();
-            i++;
-        }
-        free.deallocate(buffers);
+    public void deallocate(RecordBatch batch) {
+        free.deallocate(batch.records.buffer());
     }
 
     /**
