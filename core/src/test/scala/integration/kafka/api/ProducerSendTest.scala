@@ -33,8 +33,6 @@ import org.junit.Assert._
 import java.util.Properties
 import java.lang.{Integer, IllegalArgumentException}
 
-
-@Ignore
 class ProducerSendTest extends JUnit3Suite with ZooKeeperTestHarness {
   private val brokerId1 = 0
   private val brokerId2 = 1

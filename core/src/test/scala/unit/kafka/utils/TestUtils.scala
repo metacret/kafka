@@ -49,8 +49,8 @@ import junit.framework.Assert._
  * Utility functions to help with testing
  */
 object TestUtils extends Logging {
-  
-  val IoTmpDir = "./build/test/"
+
+  val IoTmpDir = System.getProperty("java.io.tmpdir")
 
   val Letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
   val Digits = "0123456789"
@@ -310,8 +310,8 @@ object TestUtils extends Logging {
   /**
    * Create a producer for the given host and port
    */
-  def createProducer[K, V](brokerList: String, 
-                           encoder: Encoder[V] = new DefaultEncoder(), 
+  def createProducer[K, V](brokerList: String,
+                           encoder: Encoder[V] = new DefaultEncoder(),
                            keyEncoder: Encoder[K] = new DefaultEncoder()): Producer[K, V] = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
@@ -326,7 +326,6 @@ object TestUtils extends Logging {
   def getProducerConfig(brokerList: String, partitioner: String = "kafka.producer.DefaultPartitioner"): Properties = {
     val props = new Properties()
     props.put("metadata.broker.list", brokerList)
-    props.put("producer.discovery", "static")
     props.put("partitioner.class", partitioner)
     props.put("message.send.max.retries", "3")
     props.put("retry.backoff.ms", "1000")
@@ -386,9 +385,9 @@ object TestUtils extends Logging {
   /**
    * Create a wired format request based on simple basic information
    */
-  def produceRequest(topic: String, 
-                     partition: Int, 
-                     message: ByteBufferMessageSet, 
+  def produceRequest(topic: String,
+                     partition: Int,
+                     message: ByteBufferMessageSet,
                      acks: Int = SyncProducerConfig.DefaultRequiredAcks,
                      timeout: Int = SyncProducerConfig.DefaultAckTimeoutMs,
                      correlationId: Int = 0,
@@ -396,10 +395,10 @@ object TestUtils extends Logging {
     produceRequestWithAcks(Seq(topic), Seq(partition), message, acks, timeout, correlationId, clientId)
   }
 
-  def produceRequestWithAcks(topics: Seq[String], 
-                             partitions: Seq[Int], 
-                             message: ByteBufferMessageSet, 
-                             acks: Int = SyncProducerConfig.DefaultRequiredAcks, 
+  def produceRequestWithAcks(topics: Seq[String],
+                             partitions: Seq[Int],
+                             message: ByteBufferMessageSet,
+                             acks: Int = SyncProducerConfig.DefaultRequiredAcks,
                              timeout: Int = SyncProducerConfig.DefaultAckTimeoutMs,
                              correlationId: Int = 0,
                              clientId: String = SyncProducerConfig.DefaultClientId): ProducerRequest = {
@@ -446,7 +445,8 @@ object TestUtils extends Logging {
     else
       info("Waiting for leader for partition [%s,%d] to be changed from old leader %d".format(topic, partition, oldLeaderOpt.get))
 
-    inLock(leaderLock) {
+    leaderLock.lock()
+    try {
       zkClient.subscribeDataChanges(ZkUtils.getTopicPartitionLeaderAndIsrPath(topic, partition), new LeaderExistsOrChangedListener(topic, partition, leaderLock, leaderExistsOrChanged, oldLeaderOpt, zkClient))
       leaderExistsOrChanged.await(timeoutMs, TimeUnit.MILLISECONDS)
       // check if leader is elected
@@ -458,12 +458,14 @@ object TestUtils extends Logging {
           else
             info("Leader for partition [%s,%d] is changed from %d to %d".format(topic, partition, oldLeaderOpt.get, l))
         case None => error("Timing out after %d ms since leader is not elected for partition [%s,%d]"
-                                   .format(timeoutMs, topic, partition))
+          .format(timeoutMs, topic, partition))
       }
       leader
+    } finally {
+      leaderLock.unlock()
     }
   }
-  
+
   /**
    * Execute the given block. If it throws an assert error, retry. Repeat
    * until no error is thrown or the time limit ellapses
@@ -477,7 +479,7 @@ object TestUtils extends Logging {
         return
       } catch {
         case e: AssertionFailedError =>
-          val ellapsed = System.currentTimeMillis - startTime 
+          val ellapsed = System.currentTimeMillis - startTime
           if(ellapsed > maxWaitMs) {
             throw e
           } else {
@@ -531,7 +533,7 @@ object TestUtils extends Logging {
       TestUtils.waitUntilTrue(() =>
         servers.foldLeft(true)(_ && _.apis.metadataCache.keySet.contains(TopicAndPartition(topic, partition))), timeout))
   }
-  
+
   def writeNonsenseToFile(fileName: File, position: Long, size: Int) {
     val file = new RandomAccessFile(fileName, "rw")
     file.seek(position)
@@ -539,7 +541,7 @@ object TestUtils extends Logging {
       file.writeByte(random.nextInt(255))
     file.close()
   }
-  
+
   def appendNonsenseToFile(fileName: File, size: Int) {
     val file = new FileOutputStream(fileName, true)
     for(i <- 0 until size)
@@ -556,7 +558,7 @@ object TestUtils extends Logging {
   }
 
   def ensureNoUnderReplicatedPartitions(zkClient: ZkClient, topic: String, partitionToBeReassigned: Int, assignedReplicas: Seq[Int],
-                                                servers: Seq[KafkaServer]) {
+                                        servers: Seq[KafkaServer]) {
     val inSyncReplicas = ZkUtils.getInSyncReplicasForPartition(zkClient, topic, partitionToBeReassigned)
     assertFalse("Reassigned partition [%s,%d] is underreplicated".format(topic, partitionToBeReassigned),
       inSyncReplicas.size < assignedReplicas.size)

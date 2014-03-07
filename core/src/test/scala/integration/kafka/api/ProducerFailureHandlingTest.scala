@@ -72,6 +72,7 @@ class ProducerFailureHandlingTest extends JUnit3Suite with ZooKeeperTestHarness 
     producerProps.put(ProducerConfig.METADATA_FETCH_TIMEOUT_CONFIG, metadataFetchTimeout.toString)
     producerProps.put(ProducerConfig.BLOCK_ON_BUFFER_FULL_CONFIG, blockOnBufferFull.toString)
     producerProps.put(ProducerConfig.TOTAL_BUFFER_MEMORY_CONFIG, bufferSize.toString)
+    producerProps.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, (10 * 1024 * 1024).toString())
     return new KafkaProducer(producerProps)
   }
 
