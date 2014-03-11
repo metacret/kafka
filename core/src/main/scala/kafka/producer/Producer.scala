@@ -41,7 +41,7 @@ class Producer[K,V](val config: ProducerConfig,
         Utils.createObject[SerDe[K,V]](config.fileQueueSerDe))
   }
 
-  newGauge("ProducerQueueSize",
+  newGauge("ProducerQueueSize-" + config.clientId,
     new Gauge[Int] {
       def value = queue.size()
     }

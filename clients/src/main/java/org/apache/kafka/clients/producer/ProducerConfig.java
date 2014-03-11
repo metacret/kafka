@@ -155,11 +155,11 @@ public class ProducerConfig extends AbstractConfig {
                                 .define(CLIENT_ID_CONFIG, Type.STRING, "", "blah blah")
                                 .define(SEND_BUFFER_CONFIG, Type.INT, 128 * 1024, atLeast(0), "blah blah")
                                 .define(RECEIVE_BUFFER_CONFIG, Type.INT, 32 * 1024, atLeast(0), "blah blah")
-                                .define(MAX_REQUEST_SIZE_CONFIG, Type.INT, 1 * 1024 * 1024, atLeast(0), "blah blah")
+                                .define(MAX_REQUEST_SIZE_CONFIG, Type.INT, 10 * 1024 * 1024, atLeast(0), "blah blah")
                                 .define(RECONNECT_BACKOFF_MS_CONFIG, Type.LONG, 10L, atLeast(0L), "blah blah")
                                 .define(BLOCK_ON_BUFFER_FULL_CONFIG, Type.BOOLEAN, true, "blah blah")
                                 .define(ENABLE_JMX_CONFIG, Type.BOOLEAN, true, "")
-                                .define(MAX_RETRIES_CONFIG, Type.INT, 0, between(0, Integer.MAX_VALUE), "")
+                                .define(MAX_RETRIES_CONFIG, Type.INT, 3, between(0, Integer.MAX_VALUE), "")
                                 .define(RETRY_BACKOFF_MS_CONFIG, Type.LONG, 100L, atLeast(0L), "blah blah");
     }
 
